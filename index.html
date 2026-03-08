@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>돌봄매트 AI 최적 배치 시뮬레이터</title>
+    <style>
+        body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; background-color: #1e1e1e; color: #ffffff; margin: 0; padding: 20px; display: flex; gap: 20px; height: 100vh; box-sizing: border-box; }
+        
+        /* 왼쪽 패널: 조작부 */
+        #control-panel { width: 320px; background: #2d2d2d; padding: 25px; border-radius: 12px; box-shadow: 0 8px 16px rgba(0,0,0,0.3); display: flex; flex-direction: column; gap: 15px; }
+        h2 { margin-top: 0; color: #1dd1a1; font-size: 22px; margin-bottom: 5px; }
+        p.desc { color: #aaa; font-size: 13px; line-height: 1.5; margin-top: 0; }
+        
+        .tool-btn { padding: 12px; border: none; border-radius: 8px; cursor: pointer; color: white; font-weight: bold; font-size: 15px; transition: 0.2s; background: #444; text-align: left; padding-left: 20px;}
+        .tool-btn.active { background: #77acf1; box-shadow: 0 0 10px rgba(119, 172, 241, 0.5); }
+        .tool-btn:hover:not(.active) { background: #555; }
+        
+        .ai-btn { background: #ff6b6b; font-size: 16px; text-align: center; padding: 15px; margin-top: 10px; }
+        .ai-btn:hover { background: #ff4757; box-shadow: 0 0 15px rgba(255, 107, 107, 0.6); }
+
+        .clear-btn { background: #333; text-align: center; }
+        .clear-btn:hover { background: #222; }
+
+        /* 결과 표시창 */
+        #result-box { margin-top: auto; background: #1e1e1e; padding: 20px; border-radius: 8px; border: 1px solid #444; text-align: center; }
+        #result-box h3 { margin: 0; color: #feca57; font-size: 16px; }
+        #mat-count { font-size: 40px; font-weight: bold; color: #fff; margin: 10px 0; }
+        .unit { font-size: 16px; color: #aaa; }
+
+        /* 오른쪽 패널: 도면 캔버스 */
+        #canvas-wrap { flex: 1; background: #2d2d2d; border-radius: 12px; display: flex; justify-content: center; align-items: center; overflow: hidden; position: relative; box-shadow: 0 8px 16px rgba(0,0,0,0.3); }
+        
+        /* 캔버스 (모눈종이 배경) */
+        canvas { 
+            background-color: #f0f0f0; 
+            background-image: linear-gradient(#e0e0e0 1px, transparent 1px), linear-gradient(90deg, #e0e0e0 1px, transparent 1px);
+            background-size: 10px 10px; /* 10cm 격자 배경 */
+            cursor: crosshair;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="control-panel">
+        <h2>🛠️ 매트 플래너</h2>
+        <p class="desc">1. 브러쉬로 시공할 공간을 색칠하세요.<br>2. AI 계산을 누르면 버려지는 매트가 최소화되는 시작점을 찾아 1m 격자를 그려줍니다.</p>
+        
+        <button id="btnDraw" class="tool-btn active">🖌️ 시공 공간 그리기</button>
+        <button id="btnErase" class="tool-btn">🧽 지우개</button>
+        <button id="btnClear" class="tool-btn clear-btn">🗑️ 전체 초기화</button>
+        
+        <button id="btnAI" class="tool-btn ai-btn">✨ AI 최적 배치 계산</button>
+
+        <div id="result-box">
+            <h3>필요한 1m 매트 수량</h3>
+            <div id="mat-count">0<span class="unit"> 장</span></div>
+            <p id="saving-msg" style="color: #1dd1a1; font-size: 13px; margin: 0; display: none;">최적화로 자재를 절약했습니다!</p>
+        </div>
+    </div>
+
+    <div id="canvas-wrap">
+        <canvas id="roomCanvas" width="600" height="600"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('roomCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // 스케일 설정: 100 픽셀 = 1m (매트 1장)
+        const MAT_SIZE = 100; 
+        const CANVAS_SIZE = 600; // 6m x 6m 공간
+        
+        let isDrawing = false;
+        let mode = 'draw'; // 'draw' or 'erase'
+
+        // 브러쉬 크기 (약 30cm)
+        const brushSize = 30; 
+
+        // 사용자가 그린 공간을 10cm(10px) 단위로 저장할 배열 (60x60 배열)
+        const GRID_RES = 10; 
+        const cols = CANVAS_SIZE / GRID_RES;
+        const rows = CANVAS_SIZE / GRID_RES;
+        let roomGrid = Array.from({length: rows}, () => Array(cols).fill(false));
+
+        // 저장된 매트 배치 결과
+        let bestMats = [];
+
+        // 툴 버튼 제어
+        document.getElementById('btnDraw').addEventListener('click', (e) => { mode = 'draw'; updateBtnStyle(e.target); });
+        document.getElementById('btnErase').addEventListener('click', (e) => { mode = 'erase'; updateBtnStyle(e.target); });
+        document.getElementById('btnClear').addEventListener('click', () => {
+            roomGrid = Array.from({length: rows}, () => Array(cols).fill(false));
+            bestMats = [];
+            document.getElementById('mat-count').innerHTML = '0<span class="unit"> 장</span>';
+            document.getElementById('saving-msg').style.display = 'none';
+            redraw();
+        });
+
+        function updateBtnStyle(activeBtn) {
+            document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+            if(activeBtn.id !== 'btnClear' && activeBtn.id !== 'btnAI') activeBtn.classList.add('active');
+        }
+
+        // 캔버스 그리기 마우스 이벤트
+        canvas.addEventListener('mousedown', startPosition);
+        canvas.addEventListener('mouseup', endPosition);
+        canvas.addEventListener('mouseleave', endPosition);
+        canvas.addEventListener('mousemove', draw);
+
+        function startPosition(e) { isDrawing = true; draw(e); }
+        function endPosition() { isDrawing = false; }
+
+        function draw(e) {
+            if (!isDrawing) return;
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            // 브러쉬 영역을 배열에 저장 (10px 단위)
+            let startCol = Math.max(0, Math.floor((x - brushSize/2) / GRID_RES));
+            let endCol = Math.min(cols - 1, Math.floor((x + brushSize/2) / GRID_RES));
+            let startRow = Math.max(0, Math.floor((y - brushSize/2) / GRID_RES));
+            let endRow = Math.min(rows - 1, Math.floor((y + brushSize/2) / GRID_RES));
+
+            for(let r = startRow; r <= endRow; r++) {
+                for(let c = startCol; c <= endCol; c++) {
+                    // 원형 브러쉬 느낌을 위해 거리 계산
+                    let cellCX = c * GRID_RES + GRID_RES/2;
+                    let cellCY = r * GRID_RES + GRID_RES/2;
+                    let dist = Math.sqrt(Math.pow(cellCX - x, 2) + Math.pow(cellCY - y, 2));
+                    if (dist <= brushSize/2) {
+                        roomGrid[r][c] = (mode === 'draw');
+                    }
+                }
+            }
+            redraw();
+        }
+
+        // 화면 다시 그리기
+        function redraw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. 사용자가 그린 시공 공간 표시 (파란색 반투명)
+            ctx.fillStyle = 'rgba(119, 172, 241, 0.6)';
+            for(let r = 0; r < rows; r++) {
+                for(let c = 0; c < cols; c++) {
+                    if(roomGrid[r][c]) {
+                        ctx.fillRect(c * GRID_RES, r * GRID_RES, GRID_RES, GRID_RES);
+                    }
+                }
+            }
+
+            // 2. AI가 찾은 최적 매트 격자 그리기
+            if (bestMats.length > 0) {
+                ctx.strokeStyle = '#ff4757'; // 빨간색 테두리
+                ctx.lineWidth = 2;
+                ctx.fillStyle = 'rgba(255, 71, 87, 0.2)'; // 매트 내부 옅은 빨강
+                
+                bestMats.forEach(mat => {
+                    ctx.fillRect(mat.x * GRID_RES, mat.y * GRID_RES, MAT_SIZE, MAT_SIZE);
+                    ctx.strokeRect(mat.x * GRID_RES, mat.y * GRID_RES, MAT_SIZE, MAT_SIZE);
+                    
+                    // 중앙에 점 찍기 (가독성)
+                    ctx.fillStyle = '#ff4757';
+                    ctx.beginPath();
+                    ctx.arc(mat.x * GRID_RES + MAT_SIZE/2, mat.y * GRID_RES + MAT_SIZE/2, 3, 0, Math.PI*2);
+                    ctx.fill();
+                    ctx.fillStyle = 'rgba(255, 71, 87, 0.2)';
+                });
+            }
+        }
+
+        // ★ 핵심: AI 최적 배치 알고리즘 ★
+        document.getElementById('btnAI').addEventListener('click', () => {
+            let minMatsNeeded = Infinity;
+            let worstMatsNeeded = 0; // 절약된 양을 계산하기 위함
+            let optimalMatPositions = [];
+
+            // 1m 매트는 10x10 격자(100px)를 차지합니다.
+            // 격자의 시작점(Offset)을 0~9칸(0~90cm)까지 1칸(10cm)씩 이동시켜보며 완전 탐색합니다.
+            for(let offsetX = 0; offsetX < 10; offsetX++) {
+                for(let offsetY = 0; offsetY < 10; offsetY++) {
+                    
+                    let currentMatsNeeded = 0;
+                    let currentMatPositions = [];
+
+                    // 캔버스 전체를 매트 크기로 덮어봅니다. (여유 있게 -1부터 시작)
+                    for(let matCol = -1; matCol <= cols/10; matCol++) {
+                        for(let matRow = -1; matRow <= rows/10; matRow++) {
+                            
+                            // 현재 매트가 차지하는 10x10 영역의 실제 배열 인덱스 시작점
+                            let startC = matCol * 10 + offsetX;
+                            let startR = matRow * 10 + offsetY;
+                            let matUsed = false;
+
+                            // 이 매트 영역(10x10) 안에 사용자가 색칠한 공간이 단 1칸이라도 있는지 확인
+                            for(let r = 0; r < 10; r++) {
+                                for(let c = 0; c < 10; c++) {
+                                    let checkR = startR + r;
+                                    let checkC = startC + c;
+                                    // 캔버스 범위 내에 있고, 색칠되어 있다면 이 매트는 필수!
+                                    if(checkR >= 0 && checkR < rows && checkC >= 0 && checkC < cols) {
+                                        if(roomGrid[checkR][checkC]) {
+                                            matUsed = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                                if(matUsed) break;
+                            }
+
+                            if(matUsed) {
+                                currentMatsNeeded++;
+                                currentMatPositions.push({x: startC, y: startR});
+                            }
+                        }
+                    }
+
+                    // 최악의 경우(가장 많이 드는 수량) 기록
+                    if(currentMatsNeeded > worstMatsNeeded) worstMatsNeeded = currentMatsNeeded;
+
+                    // 최소 수량 갱신 (더 적은 수의 매트로 커버가 가능할 경우)
+                    if(currentMatsNeeded > 0 && currentMatsNeeded < minMatsNeeded) {
+                        minMatsNeeded = currentMatsNeeded;
+                        optimalMatPositions = currentMatPositions;
+                    }
+                }
+            }
+
+            // 결과 반영
+            if (minMatsNeeded === Infinity) {
+                alert("시공할 공간을 먼저 그려주세요!");
+                return;
+            }
+
+            bestMats = optimalMatPositions;
+            document.getElementById('mat-count').innerHTML = minMatsNeeded + '<span class="unit"> 장</span>';
+            
+            let saved = worstMatsNeeded - minMatsNeeded;
+            let msgEl = document.getElementById('saving-msg');
+            if (saved > 0) {
+                msgEl.innerText = `💡 기준점 최적화로 ${saved}장의 매트를 절약했습니다!`;
+                msgEl.style.display = 'block';
+            } else {
+                msgEl.style.display = 'none';
+            }
+            
+            redraw();
+        });
+
+    </script>
+</body>
+</html>
