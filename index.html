@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>돌봄매트 실전 시뮬레이터 (Auto-Scan & Drag)</title>
+    <title>돌봄매트 실전 시뮬레이터 (AI 최적화 + 드래그)</title>
     <style>
         body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; background-color: #1e1e1e; color: #ffffff; margin: 0; padding: 20px; display: flex; gap: 20px; height: 100vh; box-sizing: border-box; }
         
@@ -14,8 +14,6 @@
         .section-title { font-size: 14px; color: #77acf1; font-weight: bold; margin-bottom: 10px; margin-top: 0; }
         
         input[type="file"] { width: 100%; color: #aaa; font-size: 12px; margin-bottom: 10px; }
-        .slider-wrap { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: #ccc; margin-bottom: 8px;}
-        .slider-wrap input[type="range"] { flex: 1; margin: 0 10px; }
 
         .btn-group { display: flex; gap: 10px; margin-bottom: 5px; }
         .tool-btn { flex: 1; padding: 10px; border: none; border-radius: 6px; cursor: pointer; color: white; font-weight: bold; font-size: 13px; transition: 0.2s; background: #444; }
@@ -27,8 +25,12 @@
         #btnCalibrate.active { background: #8e44ad; border: 2px solid #fff;}
         #btnMagic { background: #f39c12; width: 100%; margin-bottom: 5px; color: #fff;}
         #btnMagic.active { background: #e67e22; border: 2px solid #fff;}
-        #btnDragGrid { background: #1dd1a1; width: 100%; color: #1e1e1e;}
-        #btnDragGrid.active { background: #10ac84; border: 2px solid #fff;}
+        #btnDragGrid { background: #444; width: 100%; margin-top: 10px;}
+        #btnDragGrid.active { background: #77acf1; border: 2px solid #fff;}
+
+        /* AI 자동 최적화 버튼 강조 */
+        .ai-optimize-btn { background: #ff4757; color: white; font-size: 15px; text-align: center; padding: 12px; width: 100%; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 10px rgba(255, 71, 87, 0.4);}
+        .ai-optimize-btn:hover { background: #ff6b81; transform: translateY(-2px); }
 
         .clear-btn { background: #ff6b6b; width: 100%; margin-top: 5px; }
         .clear-btn:hover { background: #ff4757; }
@@ -39,8 +41,6 @@
         .unit { font-size: 14px; color: #aaa; font-weight: normal; }
 
         #canvas-wrap { flex: 1; background: #111; border-radius: 12px; overflow: hidden; position: relative; box-shadow: 0 8px 16px rgba(0,0,0,0.3); border: 1px solid #333; display: flex; justify-content: center; align-items: center;}
-        
-        /* 캔버스가 화면에 꽉 차면서 비율을 유지하도록 설정 */
         canvas { background-color: #ffffff; max-width: 100%; max-height: 100%; object-fit: contain; box-shadow: 0 0 20px rgba(0,0,0,0.5); cursor: crosshair;}
     </style>
 </head>
@@ -53,11 +53,11 @@
             <h3 class="section-title">1. 도면 올리고 스케일 맞추기</h3>
             <input type="file" id="bgUploader" accept="image/*">
             <button id="btnCalibrate" class="tool-btn">📏 1. 실제 길이 입력 (필수)</button>
-            <p style="font-size: 11px; color: #aaa; margin: 5px 0 0 0;">도면 위 선(예: 4.50m)을 마우스로 드래그하세요.</p>
+            <p style="font-size: 11px; color: #aaa; margin: 5px 0 0 0;">도면 위 선(예: 4.50)을 마우스로 드래그하세요.</p>
         </div>
 
         <div class="section-box">
-            <h3 class="section-title">2. 매트 깔 공간 자동 스캔</h3>
+            <h3 class="section-title">2. 시공 공간 스캔</h3>
             <button id="btnMagic" class="tool-btn">🪄 2. 방바닥 자동 스캔 (원클릭)</button>
             <p style="font-size: 11px; color: #aaa; margin: 5px 0 10px 0;">클릭하면 벽을 인식해 바닥을 자동 색칠합니다.</p>
             <div class="btn-group">
@@ -67,16 +67,19 @@
             <button id="btnClearMask" class="tool-btn clear-btn">🗑️ 색칠 초기화</button>
         </div>
         
-        <div class="section-box">
-            <h3 class="section-title">3. 매트 기준점 자유 이동</h3>
-            <button id="btnDragGrid" class="tool-btn active">🖐️ 3. 1m 매트 그리드 이동하기</button>
-            <p style="font-size: 11px; color: #aaa; margin: 5px 0 0 0;">도면 위를 마우스로 잡고 끌면 격자가 이동합니다!</p>
+        <div class="section-box" style="border-color: #ff4757;">
+            <h3 class="section-title" style="color: #ff4757;">3. 매트 최적 배치 찾기</h3>
+            
+            <button id="btnAIOptimize" class="ai-optimize-btn">✨ 3. AI 최소 장수 자동 찾기</button>
+            
+            <button id="btnDragGrid" class="tool-btn active">🖐️ (수동) 그리드 이동 미세조정</button>
+            <p style="font-size: 11px; color: #aaa; margin: 5px 0 0 0;">도면 위를 드래그하여 기준점을 미세조정하세요.</p>
         </div>
 
         <div id="result-box">
             <h3>필요한 1m 매트 수량</h3>
             <div id="mat-count">0<span class="unit"> 장</span></div>
-            <p style="font-size: 11px; color: #aaa; margin: 5px 0 0 0;">(빨간색으로 표시된 칸의 개수입니다)</p>
+            <p id="saving-msg" style="font-size: 12px; color: #1dd1a1; margin: 5px 0 0 0; display: none; font-weight: bold;">AI가 최적의 위치를 찾았습니다!</p>
         </div>
     </div>
 
@@ -89,17 +92,12 @@
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
         
         let bgImg = null;
-        
-        // 1m가 몇 픽셀인지 저장하는 핵심 변수 (기본값 100px)
         let pixelsPerMeter = 100; 
-        
-        // 마스크(칠해진 바닥 면적)를 저장하는 배열 (캔버스와 1:1 사이즈)
         let floorMask = null; 
 
-        let mode = 'dragGrid'; // 'calibrate', 'magic', 'draw', 'erase', 'dragGrid'
+        let mode = 'dragGrid'; 
         let brushSize = 30;
 
-        // 그리드 오프셋 (마우스 드래그로 이동)
         let gridOffsetX = 0;
         let gridOffsetY = 0;
         let isDraggingGrid = false;
@@ -107,11 +105,8 @@
 
         let calibStart = null;
         let isDrawing = false;
-        
-        // 계산된 매트 정보를 담는 배열
         let activeMats = [];
 
-        // 마우스 좌표 보정 (CSS 캔버스 리사이징 대응)
         function getMousePos(e) {
             const rect = canvas.getBoundingClientRect();
             const scaleX = canvas.width / rect.width;
@@ -122,7 +117,6 @@
             };
         }
 
-        // 도면 업로드
         document.getElementById('bgUploader').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (!file) return;
@@ -130,17 +124,12 @@
             reader.onload = function(event) {
                 bgImg = new Image();
                 bgImg.onload = function() {
-                    // 캔버스 크기를 업로드한 도면 이미지 원본 크기에 딱 맞춤
                     canvas.width = bgImg.width;
                     canvas.height = bgImg.height;
-                    
-                    // 마스크 배열 초기화 (이미지 크기만큼)
                     floorMask = new Uint8Array(canvas.width * canvas.height);
-                    
-                    // 초기 스케일 대충 1m = 이미지 가로의 1/10 정도로 세팅
                     pixelsPerMeter = canvas.width / 10;
                     gridOffsetX = 0; gridOffsetY = 0;
-                    
+                    document.getElementById('saving-msg').style.display = 'none';
                     redraw();
                 };
                 bgImg.src = event.target.result;
@@ -148,13 +137,11 @@
             reader.readAsDataURL(file);
         });
 
-        // 툴 버튼 UI 연동
         function setMode(newMode, btnId) {
             mode = newMode;
             document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
             if(btnId) document.getElementById(btnId).classList.add('active');
             
-            // 마우스 커서 변경
             if (mode === 'dragGrid') canvas.style.cursor = 'grab';
             else if (mode === 'magic') canvas.style.cursor = 'cell';
             else canvas.style.cursor = 'crosshair';
@@ -168,6 +155,7 @@
         
         document.getElementById('btnClearMask').addEventListener('click', () => {
             if(floorMask) floorMask.fill(0);
+            document.getElementById('saving-msg').style.display = 'none';
             calculateMats();
             redraw();
         });
@@ -202,19 +190,18 @@
             } else if ((mode === 'draw' || mode === 'erase') && isDrawing) {
                 paintBrush(pos.x, pos.y);
             } else if (mode === 'dragGrid' && isDraggingGrid) {
-                // 마우스 이동량만큼 그리드 오프셋 이동
                 let dx = pos.x - lastMousePos.x;
                 let dy = pos.y - lastMousePos.y;
                 
                 gridOffsetX = (gridOffsetX + dx) % pixelsPerMeter;
                 gridOffsetY = (gridOffsetY + dy) % pixelsPerMeter;
                 
-                // 음수 방지
                 if (gridOffsetX < 0) gridOffsetX += pixelsPerMeter;
                 if (gridOffsetY < 0) gridOffsetY += pixelsPerMeter;
                 
                 lastMousePos = pos;
-                calculateMats(); // 그리드가 움직였으므로 즉시 매트 개수 재계산
+                document.getElementById('saving-msg').style.display = 'none'; // 수동 조작 시 AI 메세지 숨김
+                calculateMats(); 
                 redraw();
             }
         });
@@ -229,7 +216,6 @@
                 if (distPx > 20) {
                     let actualMeters = prompt("선이 그어진 실제 길이는 몇 m 입니까? (예: 4.5)");
                     if (actualMeters && !isNaN(actualMeters) && actualMeters > 0) {
-                        // ★ 마법의 스케일 계산 ★
                         pixelsPerMeter = distPx / actualMeters;
                         alert(`적용 완료! (1m = ${Math.round(pixelsPerMeter)}픽셀)\n이제 2번 '방바닥 자동 스캔'을 눌러 면적을 지정하세요.`);
                         setMode('magic', 'btnMagic');
@@ -248,15 +234,12 @@
         });
 
         // ------------------ 도구 알고리즘 ------------------
-
-        // 1. 수동 브러쉬 칠하기 (마스크 배열에 1 또는 0 기록)
         function paintBrush(x, y) {
             const r = brushSize;
             const startY = Math.max(0, Math.floor(y - r));
             const endY = Math.min(canvas.height, Math.floor(y + r));
             const startX = Math.max(0, Math.floor(x - r));
             const endX = Math.min(canvas.width, Math.floor(x + r));
-
             const val = (mode === 'draw') ? 1 : 0;
             const rSq = r * r;
 
@@ -270,19 +253,15 @@
             redraw();
         }
 
-        // 2. 자동 스캔 (마법봉 - Flood Fill 알고리즘)
-        // 사용자가 클릭한 흰색/밝은 바닥을 기준으로, 검은 선(벽)을 만날 때까지 자동으로 퍼져나갑니다.
         function magicWand(startX, startY) {
-            // 배경 이미지의 픽셀 데이터 가져오기
             const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
             const w = canvas.width;
             const h = canvas.height;
             
-            // 픽셀이 밝은지(벽이 아닌지) 체크하는 함수 (간단한 명도 체크)
             function isFloor(x, y) {
                 const idx = (y * w + x) * 4;
                 const brightness = (imgData[idx] + imgData[idx+1] + imgData[idx+2]) / 3;
-                return brightness > 150; // 밝기가 150 이상이면 바닥으로 인식
+                return brightness > 150; 
             }
 
             if (!isFloor(startX, startY)) {
@@ -290,18 +269,14 @@
                 return;
             }
 
-            // BFS를 이용한 색칠
             const queue = [[startX, startY]];
             const visited = new Uint8Array(w * h);
             visited[startY * w + startX] = 1;
 
             while (queue.length > 0) {
                 const [x, y] = queue.pop();
-                
-                // 마스크에 칠하기
                 floorMask[y * w + x] = 1;
 
-                // 상하좌우 탐색
                 const dirs = [[1,0], [-1,0], [0,1], [0,-1]];
                 for (let [dx, dy] of dirs) {
                     const nx = x + dx;
@@ -316,27 +291,22 @@
                 }
             }
             
-            calculateMats(); // 칠해진 영역 기반 매트 수 다시 계산
-            setMode('dragGrid', 'btnDragGrid'); // 자동 스캔 끝나면 곧바로 드래그 모드로 전환
+            document.getElementById('saving-msg').style.display = 'none';
+            calculateMats(); 
+            setMode('dragGrid', 'btnDragGrid'); 
             redraw();
         }
 
-        // 3. 매트 겹침 계산 (가장 핵심 로직)
         function calculateMats() {
             if (!floorMask) return;
             activeMats = [];
             let count = 0;
+            const PPM = Math.round(pixelsPerMeter); 
+            const step = 8; // 퍼포먼스 최적화
 
-            const PPM = Math.round(pixelsPerMeter); // 1m 크기 (픽셀)
-            const step = 5; // 성능 최적화를 위해 마스크 검사 시 5픽셀 단위로 점프하며 검사
-
-            // 캔버스 전체를 1m(PPM) 간격의 그리드로 분할 (오프셋 적용)
             for (let y = gridOffsetY - PPM; y < canvas.height; y += PPM) {
                 for (let x = gridOffsetX - PPM; x < canvas.width; x += PPM) {
-                    
                     let isOverlap = false;
-                    
-                    // 해당 1m 네모 칸(PPM x PPM) 안에 floorMask(칠해진 바닥)이 1픽셀이라도 있는지 검사
                     const startY = Math.max(0, Math.floor(y));
                     const endY = Math.min(canvas.height, Math.floor(y + PPM));
                     const startX = Math.max(0, Math.floor(x));
@@ -345,8 +315,7 @@
                     for (let cy = startY; cy < endY; cy += step) {
                         for (let cx = startX; cx < endX; cx += step) {
                             if (floorMask[cy * canvas.width + cx] === 1) {
-                                isOverlap = true;
-                                break;
+                                isOverlap = true; break;
                             }
                         }
                         if (isOverlap) break;
@@ -358,36 +327,75 @@
                     }
                 }
             }
-            
             document.getElementById('mat-count').innerHTML = count + `<span class="unit"> 장</span>`;
+            return count; // AI 탐색용 반환값
         }
+
+        // ★ 핵심 추가: AI 최적화 오토-시뮬레이션 ★
+        document.getElementById('btnAIOptimize').addEventListener('click', () => {
+            if (!floorMask) {
+                alert("먼저 방바닥 면적을 자동스캔(색칠) 해주세요!");
+                return;
+            }
+            
+            const PPM = Math.round(pixelsPerMeter);
+            let minMats = Infinity;
+            let bestOffsetX = 0;
+            let bestOffsetY = 0;
+            
+            // X, Y축으로 10픽셀씩 이동시키며 가장 적은 매트가 드는 위치를 브루트 포스 탐색
+            const stepSize = Math.max(5, Math.floor(PPM / 10)); // 적절한 탐색 간격 설정
+            
+            for(let ox = 0; ox < PPM; ox += stepSize) {
+                for(let oy = 0; oy < PPM; oy += stepSize) {
+                    gridOffsetX = ox;
+                    gridOffsetY = oy;
+                    
+                    let currentCount = calculateMats(); // 임시 계산
+                    
+                    if (currentCount > 0 && currentCount < minMats) {
+                        minMats = currentCount;
+                        bestOffsetX = ox;
+                        bestOffsetY = oy;
+                    }
+                }
+            }
+
+            // 최적의 위치로 최종 확정
+            gridOffsetX = bestOffsetX;
+            gridOffsetY = bestOffsetY;
+            calculateMats(); 
+            redraw();
+
+            // 성공 메세지
+            const msgEl = document.getElementById('saving-msg');
+            msgEl.innerText = `💡 AI 최적화 완료! 최소 수량은 ${minMats}장 입니다.`;
+            msgEl.style.display = 'block';
+            setMode('dragGrid', 'btnDragGrid'); // 수동 조정 모드로 진입
+        });
+
 
         // ------------------ 화면 렌더링 ------------------
         function redraw() {
             if (!bgImg) return;
             
-            // 1. 도면 깔기
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.drawImage(bgImg, 0, 0);
 
-            // 2. 스캔된 바닥(Mask) 파란색으로 덧칠하기
             if (floorMask) {
-                // 투명도 있는 파란색 이미지 데이터 생성
                 const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                 for (let i = 0; i < floorMask.length; i++) {
                     if (floorMask[i] === 1) {
                         const idx = i * 4;
-                        imgData.data[idx] = 119;     // R
-                        imgData.data[idx+1] = 172;   // G
-                        imgData.data[idx+2] = 241;   // B
-                        // 기존 픽셀 위에 파란색 필터 느낌으로 알파값 블렌딩
-                        imgData.data[idx+3] = 100;   // A (투명도)
+                        imgData.data[idx] = 119;   
+                        imgData.data[idx+1] = 172; 
+                        imgData.data[idx+2] = 241; 
+                        imgData.data[idx+3] = 100; // 투명도
                     }
                 }
                 ctx.putImageData(imgData, 0, 0);
             }
 
-            // 3. 스케일 선 그리기 (드래그 중일 때)
             if (mode === 'calibrate' && calibStart && lastMousePos && isDrawing) {
                 ctx.strokeStyle = '#9b59b6'; ctx.lineWidth = 4;
                 ctx.beginPath(); ctx.moveTo(calibStart.x, calibStart.y); ctx.lineTo(lastMousePos.x, lastMousePos.y); ctx.stroke();
@@ -397,12 +405,11 @@
                 ctx.beginPath(); ctx.arc(lastMousePos.x, lastMousePos.y, 6, 0, Math.PI*2); ctx.fill();
             }
 
-            // 4. 활성화된 1m 매트 (계산 결과) 빨간색으로 그리기
             if (activeMats.length > 0) {
                 const PPM = Math.round(pixelsPerMeter);
                 ctx.strokeStyle = '#ff4757'; 
                 ctx.lineWidth = 2;
-                ctx.fillStyle = 'rgba(255, 71, 87, 0.25)'; // 살짝 진한 투명 빨강
+                ctx.fillStyle = 'rgba(255, 71, 87, 0.25)'; 
                 
                 activeMats.forEach(mat => {
                     ctx.fillRect(mat.x, mat.y, PPM, PPM);
@@ -410,7 +417,6 @@
                 });
             }
 
-            // 5. 전체 배경 1m 그리드 선 옅게 그리기 (마스크가 없어도 기준선은 보이도록)
             ctx.strokeStyle = 'rgba(0,0,0,0.2)';
             ctx.lineWidth = 1;
             const PPM = Math.round(pixelsPerMeter);
