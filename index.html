@@ -2,46 +2,58 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>돌봄매트 실전 시뮬레이터 (AI 최적화 + 드래그)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>돌봄매트 현장용 시뮬레이터 (태블릿 최적화 & 장애물 처리)</title>
     <style>
-        body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; background-color: #1e1e1e; color: #ffffff; margin: 0; padding: 20px; display: flex; gap: 20px; height: 100vh; box-sizing: border-box; }
+        /* 태블릿/모바일 터치 환경에 맞춰 폰트와 간격을 큼직하게 수정 */
+        body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; background-color: #1e1e1e; color: #ffffff; margin: 0; padding: 15px; display: flex; gap: 15px; height: 100vh; box-sizing: border-box; flex-wrap: wrap;}
         
-        #control-panel { width: 340px; background: #2d2d2d; padding: 20px; border-radius: 12px; box-shadow: 0 8px 16px rgba(0,0,0,0.3); display: flex; flex-direction: column; gap: 15px; overflow-y: auto; }
-        h2 { margin-top: 0; color: #1dd1a1; font-size: 20px; margin-bottom: 5px; }
+        #control-panel { width: 360px; background: #2d2d2d; padding: 20px; border-radius: 12px; box-shadow: 0 8px 16px rgba(0,0,0,0.3); display: flex; flex-direction: column; gap: 12px; overflow-y: auto; flex-shrink: 0; }
         
-        .section-box { background: #1e1e1e; padding: 15px; border-radius: 8px; border: 1px solid #444; }
-        .section-title { font-size: 14px; color: #77acf1; font-weight: bold; margin-bottom: 10px; margin-top: 0; }
-        
-        input[type="file"] { width: 100%; color: #aaa; font-size: 12px; margin-bottom: 10px; }
+        /* 화면이 좁은 모바일에서는 패널이 위로, 캔버스가 아래로 배치되도록 반응형 적용 */
+        @media (max-width: 800px) {
+            body { flex-direction: column; height: auto; }
+            #control-panel { width: 100%; }
+            #canvas-wrap { height: 60vh; }
+        }
 
-        .btn-group { display: flex; gap: 10px; margin-bottom: 5px; }
-        .tool-btn { flex: 1; padding: 10px; border: none; border-radius: 6px; cursor: pointer; color: white; font-weight: bold; font-size: 13px; transition: 0.2s; background: #444; }
-        .tool-btn.active { background: #77acf1; box-shadow: 0 0 8px rgba(119, 172, 241, 0.5); }
+        h2 { margin-top: 0; color: #1dd1a1; font-size: 22px; margin-bottom: 5px; }
+        
+        .section-box { background: #1e1e1e; padding: 15px; border-radius: 10px; border: 1px solid #444; }
+        .section-title { font-size: 15px; color: #77acf1; font-weight: bold; margin-bottom: 10px; margin-top: 0; }
+        
+        input[type="file"] { width: 100%; color: #aaa; font-size: 14px; margin-bottom: 10px; }
+
+        .btn-group { display: flex; gap: 8px; margin-bottom: 8px; }
+        .tool-btn { flex: 1; padding: 14px 10px; border: none; border-radius: 8px; cursor: pointer; color: white; font-weight: bold; font-size: 14px; transition: 0.2s; background: #444; touch-action: manipulation; }
+        .tool-btn.active { background: #77acf1; box-shadow: 0 0 10px rgba(119, 172, 241, 0.6); border: 2px solid #fff;}
         .tool-btn:hover:not(.active) { background: #555; }
         
-        /* 스텝별 버튼 강조 색상 */
+        /* 스텝별 버튼 디자인 */
         #btnCalibrate { background: #9b59b6; width: 100%; margin-bottom: 5px;}
-        #btnCalibrate.active { background: #8e44ad; border: 2px solid #fff;}
-        #btnMagic { background: #f39c12; width: 100%; margin-bottom: 5px; color: #fff;}
-        #btnMagic.active { background: #e67e22; border: 2px solid #fff;}
-        #btnDragGrid { background: #444; width: 100%; margin-top: 10px;}
-        #btnDragGrid.active { background: #77acf1; border: 2px solid #fff;}
+        #btnCalibrate.active { background: #8e44ad; }
+        
+        #btnMagic { background: #f39c12; width: 100%; margin-bottom: 8px; color: #fff; font-size: 15px;}
+        #btnMagic.active { background: #e67e22; }
+        
+        #btnObstacle { background: #ff4757; }
+        #btnObstacle.active { background: #ff6b81; box-shadow: 0 0 10px rgba(255, 71, 87, 0.6); }
 
-        /* AI 자동 최적화 버튼 강조 */
-        .ai-optimize-btn { background: #ff4757; color: white; font-size: 15px; text-align: center; padding: 12px; width: 100%; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 10px rgba(255, 71, 87, 0.4);}
+        #btnDragGrid { background: #444; width: 100%; margin-top: 10px;}
+        #btnDragGrid.active { background: #77acf1; }
+
+        .ai-optimize-btn { background: #ff4757; color: white; font-size: 16px; text-align: center; padding: 16px; width: 100%; border-radius: 10px; font-weight: 900; border: none; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 12px rgba(255, 71, 87, 0.5); touch-action: manipulation;}
         .ai-optimize-btn:hover { background: #ff6b81; transform: translateY(-2px); }
 
-        .clear-btn { background: #ff6b6b; width: 100%; margin-top: 5px; }
-        .clear-btn:hover { background: #ff4757; }
-
-        #result-box { background: #1e1e1e; padding: 15px; border-radius: 8px; border: 1px solid #444; text-align: center; margin-top: auto;}
-        #result-box h3 { margin: 0; color: #fff; font-size: 14px; }
-        #mat-count { font-size: 44px; font-weight: bold; color: #ff4757; margin: 5px 0; }
-        .unit { font-size: 14px; color: #aaa; font-weight: normal; }
+        #result-box { background: #1e1e1e; padding: 20px; border-radius: 10px; border: 1px solid #444; text-align: center; margin-top: auto;}
+        #result-box h3 { margin: 0; color: #fff; font-size: 15px; }
+        #mat-count { font-size: 48px; font-weight: bold; color: #ff4757; margin: 10px 0; }
+        .unit { font-size: 16px; color: #aaa; font-weight: normal; }
 
         #canvas-wrap { flex: 1; background: #111; border-radius: 12px; overflow: hidden; position: relative; box-shadow: 0 8px 16px rgba(0,0,0,0.3); border: 1px solid #333; display: flex; justify-content: center; align-items: center;}
-        canvas { background-color: #ffffff; max-width: 100%; max-height: 100%; object-fit: contain; box-shadow: 0 0 20px rgba(0,0,0,0.5); cursor: crosshair;}
+        
+        /* 캔버스 터치 최적화 (기본 스크롤 방지) */
+        canvas { background-color: #ffffff; max-width: 100%; max-height: 100%; object-fit: contain; box-shadow: 0 0 20px rgba(0,0,0,0.5); touch-action: none; cursor: crosshair;}
     </style>
 </head>
 <body>
@@ -53,33 +65,31 @@
             <h3 class="section-title">1. 도면 올리고 스케일 맞추기</h3>
             <input type="file" id="bgUploader" accept="image/*">
             <button id="btnCalibrate" class="tool-btn">📏 1. 실제 길이 입력 (필수)</button>
-            <p style="font-size: 11px; color: #aaa; margin: 5px 0 0 0;">도면 위 선(예: 4.50)을 마우스로 드래그하세요.</p>
+            <p style="font-size: 12px; color: #aaa; margin: 5px 0 0 0;">도면 위 선(예: 4.5m)을 손가락으로 드래그하세요.</p>
         </div>
 
         <div class="section-box">
-            <h3 class="section-title">2. 시공 공간 스캔</h3>
-            <button id="btnMagic" class="tool-btn">🪄 2. 방바닥 자동 스캔 (원클릭)</button>
-            <p style="font-size: 11px; color: #aaa; margin: 5px 0 10px 0;">클릭하면 벽을 인식해 바닥을 자동 색칠합니다.</p>
+            <h3 class="section-title">2. 시공 공간 지정 (바닥 & 장애물)</h3>
+            <button id="btnMagic" class="tool-btn">🪄 2. 바닥 자동 스캔 (원터치)</button>
+            
             <div class="btn-group">
-                <button id="btnDraw" class="tool-btn">🖌️ 수동 칠하기</button>
+                <button id="btnDraw" class="tool-btn">🖌️ 수동 바닥</button>
+                <button id="btnObstacle" class="tool-btn">🚫 장애물 (제외)</button>
                 <button id="btnErase" class="tool-btn">🧽 지우개</button>
             </div>
-            <button id="btnClearMask" class="tool-btn clear-btn">🗑️ 색칠 초기화</button>
+            <p style="font-size: 12px; color: #aaa; margin: 0;">※ 식탁, 소파 자리를 [장애물] 펜으로 칠하면 장수 계산에서 빠집니다.</p>
         </div>
         
         <div class="section-box" style="border-color: #ff4757;">
             <h3 class="section-title" style="color: #ff4757;">3. 매트 최적 배치 찾기</h3>
-            
             <button id="btnAIOptimize" class="ai-optimize-btn">✨ 3. AI 최소 장수 자동 찾기</button>
-            
             <button id="btnDragGrid" class="tool-btn active">🖐️ (수동) 그리드 이동 미세조정</button>
-            <p style="font-size: 11px; color: #aaa; margin: 5px 0 0 0;">도면 위를 드래그하여 기준점을 미세조정하세요.</p>
         </div>
 
         <div id="result-box">
             <h3>필요한 1m 매트 수량</h3>
             <div id="mat-count">0<span class="unit"> 장</span></div>
-            <p id="saving-msg" style="font-size: 12px; color: #1dd1a1; margin: 5px 0 0 0; display: none; font-weight: bold;">AI가 최적의 위치를 찾았습니다!</p>
+            <p id="saving-msg" style="font-size: 13px; color: #1dd1a1; margin: 5px 0 0 0; display: none; font-weight: bold;">AI가 최적의 위치를 찾았습니다!</p>
         </div>
     </div>
 
@@ -93,30 +103,45 @@
         
         let bgImg = null;
         let pixelsPerMeter = 100; 
-        let floorMask = null; 
+        let floorMask = null; // 0: 빈공간, 1: 매트깔릴 바닥, 2: 장애물(제외)
 
         let mode = 'dragGrid'; 
-        let brushSize = 30;
+        let brushSize = 30; // 펜 굵기
 
         let gridOffsetX = 0;
         let gridOffsetY = 0;
         let isDraggingGrid = false;
-        let lastMousePos = null;
+        let lastPos = null;
 
         let calibStart = null;
         let isDrawing = false;
         let activeMats = [];
 
-        function getMousePos(e) {
+        // ★ 마우스 & 터치 통합 좌표 계산 함수
+        function getPos(e) {
             const rect = canvas.getBoundingClientRect();
+            let clientX = e.clientX;
+            let clientY = e.clientY;
+            
+            // 터치 이벤트인 경우 좌표 추출
+            if (e.touches && e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else if (e.changedTouches && e.changedTouches.length > 0) {
+                clientX = e.changedTouches[0].clientX;
+                clientY = e.changedTouches[0].clientY;
+            }
+
             const scaleX = canvas.width / rect.width;
             const scaleY = canvas.height / rect.height;
+            
             return {
-                x: (e.clientX - rect.left) * scaleX,
-                y: (e.clientY - rect.top) * scaleY
+                x: (clientX - rect.left) * scaleX,
+                y: (clientY - rect.top) * scaleY
             };
         }
 
+        // 이미지 업로드
         document.getElementById('bgUploader').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (!file) return;
@@ -126,7 +151,7 @@
                 bgImg.onload = function() {
                     canvas.width = bgImg.width;
                     canvas.height = bgImg.height;
-                    floorMask = new Uint8Array(canvas.width * canvas.height);
+                    floorMask = new Uint8Array(canvas.width * canvas.height); // 초기값 0
                     pixelsPerMeter = canvas.width / 10;
                     gridOffsetX = 0; gridOffsetY = 0;
                     document.getElementById('saving-msg').style.display = 'none';
@@ -137,6 +162,7 @@
             reader.readAsDataURL(file);
         });
 
+        // UI 모드 설정
         function setMode(newMode, btnId) {
             mode = newMode;
             document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
@@ -147,51 +173,49 @@
             else canvas.style.cursor = 'crosshair';
         }
 
-        document.getElementById('btnCalibrate').addEventListener('click', () => { setMode('calibrate', 'btnCalibrate'); alert("도면 위의 수치 선(예: 4.5m)을 마우스로 드래그하세요!"); });
+        document.getElementById('btnCalibrate').addEventListener('click', () => { setMode('calibrate', 'btnCalibrate'); alert("도면 위의 수치 선(예: 4.5)을 손가락으로 길게 드래그하세요!"); });
         document.getElementById('btnMagic').addEventListener('click', () => setMode('magic', 'btnMagic'));
         document.getElementById('btnDraw').addEventListener('click', () => setMode('draw', 'btnDraw'));
         document.getElementById('btnErase').addEventListener('click', () => setMode('erase', 'btnErase'));
+        document.getElementById('btnObstacle').addEventListener('click', () => setMode('obstacle', 'btnObstacle'));
         document.getElementById('btnDragGrid').addEventListener('click', () => setMode('dragGrid', 'btnDragGrid'));
-        
-        document.getElementById('btnClearMask').addEventListener('click', () => {
-            if(floorMask) floorMask.fill(0);
-            document.getElementById('saving-msg').style.display = 'none';
-            calculateMats();
-            redraw();
-        });
 
-        // ------------------ 마우스 이벤트 ------------------
-        canvas.addEventListener('mousedown', (e) => {
+        // ------------------ 터치 & 마우스 통합 이벤트 리스너 ------------------
+        function handleStart(e) {
             if (!bgImg) return;
-            const pos = getMousePos(e);
+            e.preventDefault(); // 화면 스크롤, 줌인 방지 (아이패드 필수)
+            
+            const pos = getPos(e);
 
             if (mode === 'calibrate') {
                 calibStart = pos;
                 isDrawing = true;
-            } else if (mode === 'draw' || mode === 'erase') {
+            } else if (mode === 'draw' || mode === 'erase' || mode === 'obstacle') {
                 isDrawing = true;
                 paintBrush(pos.x, pos.y);
             } else if (mode === 'magic') {
                 magicWand(Math.floor(pos.x), Math.floor(pos.y));
             } else if (mode === 'dragGrid') {
                 isDraggingGrid = true;
-                lastMousePos = pos;
+                lastPos = pos;
                 canvas.style.cursor = 'grabbing';
             }
-        });
+        }
 
-        canvas.addEventListener('mousemove', (e) => {
+        function handleMove(e) {
             if (!bgImg) return;
-            const pos = getMousePos(e);
+            e.preventDefault();
+            
+            const pos = getPos(e);
 
             if (mode === 'calibrate' && isDrawing) {
-                lastMousePos = pos;
+                lastPos = pos;
                 redraw();
-            } else if ((mode === 'draw' || mode === 'erase') && isDrawing) {
+            } else if ((mode === 'draw' || mode === 'erase' || mode === 'obstacle') && isDrawing) {
                 paintBrush(pos.x, pos.y);
             } else if (mode === 'dragGrid' && isDraggingGrid) {
-                let dx = pos.x - lastMousePos.x;
-                let dy = pos.y - lastMousePos.y;
+                let dx = pos.x - lastPos.x;
+                let dy = pos.y - lastPos.y;
                 
                 gridOffsetX = (gridOffsetX + dx) % pixelsPerMeter;
                 gridOffsetY = (gridOffsetY + dy) % pixelsPerMeter;
@@ -199,16 +223,18 @@
                 if (gridOffsetX < 0) gridOffsetX += pixelsPerMeter;
                 if (gridOffsetY < 0) gridOffsetY += pixelsPerMeter;
                 
-                lastMousePos = pos;
-                document.getElementById('saving-msg').style.display = 'none'; // 수동 조작 시 AI 메세지 숨김
+                lastPos = pos;
+                document.getElementById('saving-msg').style.display = 'none'; 
                 calculateMats(); 
                 redraw();
             }
-        });
+        }
 
-        canvas.addEventListener('mouseup', (e) => {
+        function handleEnd(e) {
             if (!bgImg) return;
-            const pos = getMousePos(e);
+            e.preventDefault();
+            
+            const pos = getPos(e);
             
             if (mode === 'calibrate' && isDrawing) {
                 isDrawing = false;
@@ -217,13 +243,13 @@
                     let actualMeters = prompt("선이 그어진 실제 길이는 몇 m 입니까? (예: 4.5)");
                     if (actualMeters && !isNaN(actualMeters) && actualMeters > 0) {
                         pixelsPerMeter = distPx / actualMeters;
-                        alert(`적용 완료! (1m = ${Math.round(pixelsPerMeter)}픽셀)\n이제 2번 '방바닥 자동 스캔'을 눌러 면적을 지정하세요.`);
+                        alert(`적용 완료! (1m = ${Math.round(pixelsPerMeter)}픽셀)\n이제 2번 '바닥 자동 스캔' 버튼을 눌러주세요.`);
                         setMode('magic', 'btnMagic');
                     }
                 }
                 calibStart = null;
                 redraw();
-            } else if (mode === 'draw' || mode === 'erase') {
+            } else if (mode === 'draw' || mode === 'erase' || mode === 'obstacle') {
                 isDrawing = false;
                 calculateMats();
                 redraw();
@@ -231,7 +257,18 @@
                 isDraggingGrid = false;
                 canvas.style.cursor = 'grab';
             }
-        });
+        }
+
+        // 이벤트 연결 (마우스 & 터치 동시 지원)
+        canvas.addEventListener('mousedown', handleStart);
+        canvas.addEventListener('mousemove', handleMove);
+        canvas.addEventListener('mouseup', handleEnd);
+        canvas.addEventListener('mouseleave', handleEnd);
+
+        canvas.addEventListener('touchstart', handleStart, {passive: false});
+        canvas.addEventListener('touchmove', handleMove, {passive: false});
+        canvas.addEventListener('touchend', handleEnd, {passive: false});
+        canvas.addEventListener('touchcancel', handleEnd, {passive: false});
 
         // ------------------ 도구 알고리즘 ------------------
         function paintBrush(x, y) {
@@ -240,7 +277,13 @@
             const endY = Math.min(canvas.height, Math.floor(y + r));
             const startX = Math.max(0, Math.floor(x - r));
             const endX = Math.min(canvas.width, Math.floor(x + r));
-            const val = (mode === 'draw') ? 1 : 0;
+            
+            // ★ 장애물 펜은 값을 '2'로 저장합니다.
+            let val = 0;
+            if (mode === 'draw') val = 1;
+            else if (mode === 'obstacle') val = 2;
+            else if (mode === 'erase') val = 0;
+
             const rSq = r * r;
 
             for (let cy = startY; cy < endY; cy++) {
@@ -265,7 +308,7 @@
             }
 
             if (!isFloor(startX, startY)) {
-                alert("검은 벽이나 선을 클릭했습니다. 안쪽 밝은 방바닥을 클릭해주세요!");
+                alert("검은 벽이나 선을 터치했습니다. 안쪽 밝은 방바닥을 콕 찍어주세요!");
                 return;
             }
 
@@ -275,7 +318,11 @@
 
             while (queue.length > 0) {
                 const [x, y] = queue.pop();
-                floorMask[y * w + x] = 1;
+                
+                // 장애물(2)로 칠해진 곳은 마법봉이 덮어쓰지 않게 보호
+                if(floorMask[y * w + x] !== 2) {
+                    floorMask[y * w + x] = 1;
+                }
 
                 const dirs = [[1,0], [-1,0], [0,1], [0,-1]];
                 for (let [dx, dy] of dirs) {
@@ -283,7 +330,7 @@
                     const ny = y + dy;
                     if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
                         const idx = ny * w + nx;
-                        if (!visited[idx] && isFloor(nx, ny)) {
+                        if (!visited[idx] && isFloor(nx, ny) && floorMask[idx] !== 2) {
                             visited[idx] = 1;
                             queue.push([nx, ny]);
                         }
@@ -297,12 +344,13 @@
             redraw();
         }
 
+        // ★ 매트 장수 계산 (장애물 완벽 제외) ★
         function calculateMats() {
             if (!floorMask) return;
             activeMats = [];
             let count = 0;
             const PPM = Math.round(pixelsPerMeter); 
-            const step = 8; // 퍼포먼스 최적화
+            const step = 8; 
 
             for (let y = gridOffsetY - PPM; y < canvas.height; y += PPM) {
                 for (let x = gridOffsetX - PPM; x < canvas.width; x += PPM) {
@@ -314,6 +362,7 @@
 
                     for (let cy = startY; cy < endY; cy += step) {
                         for (let cx = startX; cx < endX; cx += step) {
+                            // 값 '1'(바닥)이 있을 때만 매트 설치 조건 충족 (장애물 '2'나 빈공간 '0'은 무시)
                             if (floorMask[cy * canvas.width + cx] === 1) {
                                 isOverlap = true; break;
                             }
@@ -328,30 +377,25 @@
                 }
             }
             document.getElementById('mat-count').innerHTML = count + `<span class="unit"> 장</span>`;
-            return count; // AI 탐색용 반환값
+            return count; 
         }
 
-        // ★ 핵심 추가: AI 최적화 오토-시뮬레이션 ★
+        // AI 최적화
         document.getElementById('btnAIOptimize').addEventListener('click', () => {
-            if (!floorMask) {
-                alert("먼저 방바닥 면적을 자동스캔(색칠) 해주세요!");
-                return;
-            }
+            if (!floorMask) return alert("먼저 방바닥 면적을 자동스캔 해주세요!");
             
             const PPM = Math.round(pixelsPerMeter);
             let minMats = Infinity;
             let bestOffsetX = 0;
             let bestOffsetY = 0;
             
-            // X, Y축으로 10픽셀씩 이동시키며 가장 적은 매트가 드는 위치를 브루트 포스 탐색
-            const stepSize = Math.max(5, Math.floor(PPM / 10)); // 적절한 탐색 간격 설정
+            const stepSize = Math.max(5, Math.floor(PPM / 10)); 
             
             for(let ox = 0; ox < PPM; ox += stepSize) {
                 for(let oy = 0; oy < PPM; oy += stepSize) {
                     gridOffsetX = ox;
                     gridOffsetY = oy;
-                    
-                    let currentCount = calculateMats(); // 임시 계산
+                    let currentCount = calculateMats(); 
                     
                     if (currentCount > 0 && currentCount < minMats) {
                         minMats = currentCount;
@@ -361,19 +405,16 @@
                 }
             }
 
-            // 최적의 위치로 최종 확정
             gridOffsetX = bestOffsetX;
             gridOffsetY = bestOffsetY;
             calculateMats(); 
             redraw();
 
-            // 성공 메세지
             const msgEl = document.getElementById('saving-msg');
             msgEl.innerText = `💡 AI 최적화 완료! 최소 수량은 ${minMats}장 입니다.`;
             msgEl.style.display = 'block';
-            setMode('dragGrid', 'btnDragGrid'); // 수동 조정 모드로 진입
+            setMode('dragGrid', 'btnDragGrid'); 
         });
-
 
         // ------------------ 화면 렌더링 ------------------
         function redraw() {
@@ -385,24 +426,30 @@
             if (floorMask) {
                 const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                 for (let i = 0; i < floorMask.length; i++) {
+                    const idx = i * 4;
                     if (floorMask[i] === 1) {
-                        const idx = i * 4;
+                        // 시공할 바닥 (파란색)
                         imgData.data[idx] = 119;   
                         imgData.data[idx+1] = 172; 
                         imgData.data[idx+2] = 241; 
-                        imgData.data[idx+3] = 100; // 투명도
+                        imgData.data[idx+3] = 100; 
+                    } else if (floorMask[i] === 2) {
+                        // ★ 장애물 제외 구역 (빨간색)
+                        imgData.data[idx] = 255;   
+                        imgData.data[idx+1] = 71; 
+                        imgData.data[idx+2] = 87; 
+                        imgData.data[idx+3] = 150; // 바닥보다 조금 더 진하게
                     }
                 }
                 ctx.putImageData(imgData, 0, 0);
             }
 
-            if (mode === 'calibrate' && calibStart && lastMousePos && isDrawing) {
+            if (mode === 'calibrate' && calibStart && lastPos && isDrawing) {
                 ctx.strokeStyle = '#9b59b6'; ctx.lineWidth = 4;
-                ctx.beginPath(); ctx.moveTo(calibStart.x, calibStart.y); ctx.lineTo(lastMousePos.x, lastMousePos.y); ctx.stroke();
-                
+                ctx.beginPath(); ctx.moveTo(calibStart.x, calibStart.y); ctx.lineTo(lastPos.x, lastPos.y); ctx.stroke();
                 ctx.fillStyle = '#9b59b6';
                 ctx.beginPath(); ctx.arc(calibStart.x, calibStart.y, 6, 0, Math.PI*2); ctx.fill();
-                ctx.beginPath(); ctx.arc(lastMousePos.x, lastMousePos.y, 6, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(lastPos.x, lastPos.y, 6, 0, Math.PI*2); ctx.fill();
             }
 
             if (activeMats.length > 0) {
