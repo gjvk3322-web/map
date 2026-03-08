@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>돌봄매트 AI 배치 시뮬레이터 (정밀 스케일 패치)</title>
+    <title>돌봄매트 실무자용 플래너 (그리드 수동 제어)</title>
     <style>
         body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; background-color: #1e1e1e; color: #ffffff; margin: 0; padding: 20px; display: flex; gap: 20px; height: 100vh; box-sizing: border-box; }
         
@@ -16,36 +16,39 @@
         input[type="file"] { width: 100%; color: #aaa; font-size: 12px; margin-bottom: 10px; }
         .slider-wrap { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: #ccc; margin-bottom: 8px;}
         .slider-wrap input[type="range"] { flex: 1; margin: 0 10px; }
-        select { width: 100%; padding: 8px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; font-size: 14px; outline: none; }
+        select { width: 100%; padding: 8px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; font-size: 14px; outline: none; margin-bottom: 10px;}
 
         .btn-group { display: flex; gap: 10px; margin-bottom: 5px; }
         .tool-btn { flex: 1; padding: 10px; border: none; border-radius: 6px; cursor: pointer; color: white; font-weight: bold; font-size: 13px; transition: 0.2s; background: #444; }
         .tool-btn.active { background: #77acf1; box-shadow: 0 0 8px rgba(119, 172, 241, 0.5); }
         .tool-btn:hover:not(.active) { background: #555; }
         
-        /* 스케일 보정 버튼 강조 */
-        #btnCalibrate { background: #9b59b6; width: 100%; margin-top: 5px; margin-bottom: 5px;}
-        #btnCalibrate.active { background: #8e44ad; box-shadow: 0 0 10px rgba(155, 89, 182, 0.6); border: 2px solid #fff;}
+        #btnCalibrate { background: #9b59b6; width: 100%; margin-bottom: 5px;}
+        #btnCalibrate.active { background: #8e44ad; border: 2px solid #fff;}
         
-        .clear-btn { background: #ff6b6b; flex: none; width: 100%; margin-top: 5px; }
+        .action-btn { background: #1dd1a1; width: 100%; margin-top: 5px; color: #1e1e1e;}
+        .action-btn:hover { background: #10ac84; }
+        .clear-btn { background: #ff6b6b; width: 100%; margin-top: 5px; }
         .clear-btn:hover { background: #ff4757; }
 
-        .ai-btn { background: #feca57; color: #1e1e1e; font-size: 16px; text-align: center; padding: 15px; margin-top: auto; border-radius: 8px; font-weight: 900; border: none; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 10px rgba(254, 202, 87, 0.3);}
-        .ai-btn:hover { background: #ffb142; transform: translateY(-2px); }
+        /* 매트 기준점 슬라이더 강조 */
+        .grid-control { background: rgba(254, 202, 87, 0.1); border: 1px solid #feca57; padding: 10px; border-radius: 8px; margin-top: 5px;}
+        .grid-control span { color: #feca57; font-weight: bold;}
 
-        #result-box { background: #1e1e1e; padding: 15px; border-radius: 8px; border: 1px solid #444; text-align: center; margin-top: 10px;}
+        #result-box { background: #1e1e1e; padding: 15px; border-radius: 8px; border: 1px solid #444; text-align: center; margin-top: auto;}
         #result-box h3 { margin: 0; color: #fff; font-size: 14px; }
-        #mat-count { font-size: 36px; font-weight: bold; color: #1dd1a1; margin: 5px 0; }
+        #mat-count { font-size: 40px; font-weight: bold; color: #feca57; margin: 5px 0; }
         .unit { font-size: 14px; color: #aaa; font-weight: normal; }
 
-        #canvas-wrap { flex: 1; background: #111; border-radius: 12px; overflow: auto; position: relative; box-shadow: 0 8px 16px rgba(0,0,0,0.3); border: 1px solid #333;}
-        canvas { background-color: #ffffff; cursor: crosshair; display: block; }
+        #canvas-wrap { flex: 1; background: #111; border-radius: 12px; overflow: hidden; position: relative; box-shadow: 0 8px 16px rgba(0,0,0,0.3); border: 1px solid #333; display: flex; justify-content: center; align-items: center;}
+        /* 캔버스가 화면에 딱 맞게 자동 리사이징 되도록 설정 */
+        canvas { background-color: #ffffff; cursor: crosshair; max-width: 100%; max-height: 100%; object-fit: contain;}
     </style>
 </head>
 <body>
 
     <div id="control-panel">
-        <h2>🛠️ 정밀 도면 매트 플래너</h2>
+        <h2>📐 벽면 기준 매트 플래너</h2>
         
         <div class="section-box">
             <h3 class="section-title">1. 도면 세팅 및 스케일 맞추기</h3>
@@ -55,79 +58,109 @@
                 <input type="range" id="bgOpacity" min="0" max="1" step="0.1" value="0.7">
                 <span id="opacityVal">70%</span>
             </div>
-            
-            <button id="btnCalibrate" class="tool-btn">📏 도면 실제 길이 입력 (자동 크기조절)</button>
-            <p style="font-size: 11px; color: #aaa; margin: 5px 0 0 0; line-height: 1.4;">
-                위 버튼을 누르고 도면의 치수선(예: 4.5m)을 마우스로 쭉 그어 실제 거리를 입력하세요!
-            </p>
+            <button id="btnCalibrate" class="tool-btn">📏 1. 실제 길이 입력 (스케일 보정)</button>
+            <p style="font-size: 11px; color: #aaa; margin: 5px 0 0 0;">(도면의 선을 드래그하여 실제 m 길이를 입력하세요)</p>
         </div>
 
         <div class="section-box">
-            <h3 class="section-title">2. 매트 및 브러쉬 설정</h3>
-            <div style="margin-bottom: 10px;">
-                <select id="matType">
-                    <option value="100">1m x 1m 매트 시공</option>
-                    <option value="50">50cm x 50cm 매트 시공</option>
-                </select>
-            </div>
-            <div class="slider-wrap">
-                <span>펜 굵기</span>
-                <input type="range" id="brushSize" min="10" max="100" step="10" value="30">
-                <span id="brushVal">30cm</span>
-            </div>
-            <div class="btn-group">
-                <button id="btnDraw" class="tool-btn active">🖌️ 칠하기</button>
-                <button id="btnErase" class="tool-btn">🧽 지우기</button>
-            </div>
-            <button id="btnClear" class="tool-btn clear-btn">🗑️ 칠한 공간 초기화</button>
+            <h3 class="section-title">2. 시공할 방 벽면 그리기</h3>
+            <button id="btnDraw" class="tool-btn active" style="width: 100%;">📍 2. 벽 모서리 점찍기</button>
+            <p style="font-size: 11px; color: #aaa; margin: 5px 0 5px 0;">(방의 모서리들을 순서대로 클릭하세요)</p>
+            <button id="btnComplete" class="tool-btn action-btn">✅ 다 그렸음 (도형 닫기)</button>
+            <button id="btnClear" class="tool-btn clear-btn">🗑️ 초기화</button>
         </div>
         
-        <button id="btnAI" class="ai-btn">✨ AI 최적 배치 계산</button>
+        <div class="section-box">
+            <h3 class="section-title">3. 매트 기준점 직접 움직이기</h3>
+            <select id="matType">
+                <option value="100">1m x 1m 매트 시공</option>
+                <option value="50">50cm x 50cm 매트 시공</option>
+            </select>
+            
+            <div class="grid-control">
+                <div class="slider-wrap">
+                    <span>가로 이동</span>
+                    <input type="range" id="gridOffsetX" min="0" max="100" step="5" value="0">
+                </div>
+                <div class="slider-wrap">
+                    <span>세로 이동</span>
+                    <input type="range" id="gridOffsetY" min="0" max="100" step="5" value="0">
+                </div>
+                <p style="font-size: 11px; color: #ccc; margin: 0; text-align: center;">슬라이더를 움직여 최적의 시작점을 찾으세요!</p>
+            </div>
+        </div>
 
         <div id="result-box">
             <h3>필요한 매트 수량</h3>
             <div id="mat-count">0<span class="unit"> 장</span></div>
-            <p id="saving-msg" style="color: #feca57; font-size: 12px; margin: 0; display: none;">기준점 조정으로 자재를 아꼈습니다!</p>
         </div>
     </div>
 
     <div id="canvas-wrap">
-        <canvas id="roomCanvas" width="1500" height="1500"></canvas>
+        <canvas id="roomCanvas" width="1200" height="1200"></canvas>
     </div>
 
     <script>
         const canvas = document.getElementById('roomCanvas');
         const ctx = canvas.getContext('2d');
         
-        const CANVAS_SIZE = 1500; 
+        // 내부 캔버스 해상도는 높게(1200), 화면 표시는 CSS로 자동 축소
+        const CANVAS_SIZE = 1200; 
         const PIXEL_PER_CM = 1;   
         const GRID_RES = 10;      
         const cols = CANVAS_SIZE / GRID_RES;
         const rows = CANVAS_SIZE / GRID_RES;
         
         let roomGrid = Array.from({length: rows}, () => Array(cols).fill(false));
-        let bestMats = [];
+        let polygonPoints = []; // 사용자가 찍은 모서리 점들
+        let isPolygonClosed = false;
         
-        let isDrawing = false;
-        let mode = 'draw'; // 'draw', 'erase', 'calibrate'
+        let mode = 'draw'; 
         let matSizeCM = parseInt(document.getElementById('matType').value); 
-        let brushSizeCM = parseInt(document.getElementById('brushSize').value);
+        
+        // 그리드 오프셋 (사용자가 슬라이더로 조절)
+        let gridOffsetX = 0;
+        let gridOffsetY = 0;
         
         let bgImg = null;
-        let bgScale = 1.0; // 내부적으로 자동 관리되는 스케일 값
+        let bgScale = 1.0; 
+        let bgOffsetX = 0, bgOffsetY = 0; // 이미지 중앙 정렬용
         let bgOpacity = 0.7;
 
-        // 캘리브레이션용 변수
         let calibStart = null;
         let currentMousePos = null;
+        let isDraggingCalib = false;
 
+        // 마우스 좌표 보정 함수 (CSS로 캔버스가 축소되었을 때 정확한 위치 계산)
+        function getMousePos(e) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            return {
+                x: (e.clientX - rect.left) * scaleX,
+                y: (e.clientY - rect.top) * scaleY
+            };
+        }
+
+        // 이미지 업로드 및 자동 축소 맞춤
         document.getElementById('bgUploader').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (!file) return;
             const reader = new FileReader();
             reader.onload = function(event) {
                 bgImg = new Image();
-                bgImg.onload = redraw;
+                bgImg.onload = function() {
+                    // 이미지가 캔버스에 80% 정도 차도록 넉넉하게 자동 축소
+                    const scaleX = (canvas.width * 0.8) / bgImg.width;
+                    const scaleY = (canvas.height * 0.8) / bgImg.height;
+                    bgScale = Math.min(scaleX, scaleY);
+                    
+                    // 중앙 정렬 좌표 계산
+                    bgOffsetX = (canvas.width - (bgImg.width * bgScale)) / 2;
+                    bgOffsetY = (canvas.height - (bgImg.height * bgScale)) / 2;
+                    
+                    redraw();
+                };
                 bgImg.src = event.target.result;
             }
             reader.readAsDataURL(file);
@@ -139,175 +172,241 @@
             redraw();
         });
 
+        // 매트 크기 변경 및 그리드 슬라이더 연동
+        const sliderX = document.getElementById('gridOffsetX');
+        const sliderY = document.getElementById('gridOffsetY');
+
         document.getElementById('matType').addEventListener('change', (e) => {
             matSizeCM = parseInt(e.target.value);
-            bestMats = []; 
-            document.getElementById('mat-count').innerHTML = '0<span class="unit"> 장</span>';
-            document.getElementById('saving-msg').style.display = 'none';
+            sliderX.max = matSizeCM; sliderY.max = matSizeCM;
+            sliderX.value = 0; sliderY.value = 0;
+            gridOffsetX = 0; gridOffsetY = 0;
+            calculateMats();
             redraw();
         });
 
-        document.getElementById('brushSize').addEventListener('input', (e) => {
-            brushSizeCM = parseInt(e.target.value);
-            document.getElementById('brushVal').innerText = brushSizeCM + 'cm';
-        });
+        // 사용자가 슬라이더 움직일 때마다 실시간 그리드 업데이트
+        sliderX.addEventListener('input', (e) => { gridOffsetX = parseInt(e.target.value); calculateMats(); redraw(); });
+        sliderY.addEventListener('input', (e) => { gridOffsetY = parseInt(e.target.value); calculateMats(); redraw(); });
 
-        // 툴 변경 버튼
+        // 버튼 제어
         document.getElementById('btnDraw').addEventListener('click', (e) => { mode = 'draw'; updateBtnStyle(e.target); });
-        document.getElementById('btnErase').addEventListener('click', (e) => { mode = 'erase'; updateBtnStyle(e.target); });
-        document.getElementById('btnCalibrate').addEventListener('click', (e) => { 
-            mode = 'calibrate'; 
-            updateBtnStyle(e.target); 
-            alert("도면 상에서 길이를 알고 있는 두 점(예: 4.50 이라고 적힌 벽의 양 끝)을 마우스로 쭉 드래그해서 선을 그어주세요.");
+        document.getElementById('btnCalibrate').addEventListener('click', (e) => { mode = 'calibrate'; updateBtnStyle(e.target); });
+        
+        document.getElementById('btnComplete').addEventListener('click', () => {
+            if (polygonPoints.length > 2) {
+                isPolygonClosed = true;
+                rasterizePolygon(); // 다각형 내부를 그리드 배열에 채우기
+                calculateMats();    // 매트 개수 계산
+                redraw();
+            } else {
+                alert("적어도 3개 이상의 모서리를 찍어주세요!");
+            }
         });
 
         document.getElementById('btnClear').addEventListener('click', () => {
+            polygonPoints = [];
+            isPolygonClosed = false;
             roomGrid = Array.from({length: rows}, () => Array(cols).fill(false));
-            bestMats = [];
             document.getElementById('mat-count').innerHTML = '0<span class="unit"> 장</span>';
-            document.getElementById('saving-msg').style.display = 'none';
             redraw();
         });
 
         function updateBtnStyle(activeBtn) {
             document.getElementById('btnDraw').classList.remove('active');
-            document.getElementById('btnErase').classList.remove('active');
             document.getElementById('btnCalibrate').classList.remove('active');
             activeBtn.classList.add('active');
         }
 
-        canvas.addEventListener('mousedown', startPosition);
-        canvas.addEventListener('mouseup', endPosition);
-        canvas.addEventListener('mouseleave', () => { if(isDrawing) endPosition(); });
-        canvas.addEventListener('mousemove', draw);
-
-        function startPosition(e) { 
-            isDrawing = true; 
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-
+        // 마우스 이벤트
+        canvas.addEventListener('mousedown', (e) => {
+            const pos = getMousePos(e);
             if (mode === 'calibrate') {
-                calibStart = {x: x, y: y};
-            } else {
-                draw(e); 
+                calibStart = pos;
+                isDraggingCalib = true;
+            } else if (mode === 'draw' && !isPolygonClosed) {
+                polygonPoints.push(pos);
+                redraw();
             }
-        }
+        });
 
-        function endPosition(e) { 
-            if (!isDrawing) return;
-            isDrawing = false; 
+        canvas.addEventListener('mousemove', (e) => {
+            const pos = getMousePos(e);
+            currentMousePos = pos;
+            if (mode === 'calibrate' || (mode === 'draw' && polygonPoints.length > 0 && !isPolygonClosed)) {
+                redraw();
+            }
+        });
 
-            if (mode === 'calibrate' && calibStart) {
-                const rect = canvas.getBoundingClientRect();
-                const endX = e.clientX - rect.left;
-                const endY = e.clientY - rect.top;
+        canvas.addEventListener('mouseup', (e) => {
+            if (mode === 'calibrate' && isDraggingCalib && calibStart) {
+                isDraggingCalib = false;
+                const pos = getMousePos(e);
+                let distPx = Math.hypot(pos.x - calibStart.x, pos.y - calibStart.y);
                 
-                let distPx = Math.hypot(endX - calibStart.x, endY - calibStart.y);
-                
-                if (distPx > 10) { // 너무 짧은 클릭은 무시
-                    let actualMeters = prompt("방금 그은 선의 실제 길이는 몇 m 입니까? \n(소수점 입력 가능, 예: 4.5)");
+                if (distPx > 10) { 
+                    let actualMeters = prompt("방금 그은 선의 실제 길이는 몇 m 입니까? \n(예: 4.5)");
                     if (actualMeters && !isNaN(actualMeters) && actualMeters > 0) {
-                        // ★ 핵심 공식: 타겟 픽셀(1m당 100px)에 맞게 백그라운드 스케일을 자동 계산
                         let targetPx = actualMeters * 100;
                         bgScale = (targetPx * bgScale) / distPx;
-                        
-                        alert(`스케일 세팅 완료! 이제 캔버스의 격자와 실제 도면 크기가 100% 일치합니다.\n이제 '칠하기' 버튼을 누르고 면적을 색칠하세요.`);
+                        alert("스케일이 맞춰졌습니다! 이제 '벽 모서리 점찍기'를 진행하세요.");
                     }
                 }
                 calibStart = null;
-                currentMousePos = null;
-                mode = 'draw'; // 스케일 잡으면 자동으로 칠하기 모드로 전환
+                mode = 'draw'; 
                 updateBtnStyle(document.getElementById('btnDraw'));
                 redraw();
             }
-        }
+        });
 
-        function draw(e) {
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-
-            if (mode === 'calibrate' && isDrawing) {
-                currentMousePos = {x: x, y: y};
-                redraw();
-                return;
+        // 다각형(방) 내부를 계산용 그리드(roomGrid)에 색칠하는 수학 알고리즘
+        function rasterizePolygon() {
+            roomGrid = Array.from({length: rows}, () => Array(cols).fill(false));
+            
+            // 캔버스의 보이지 않는 영역에 다각형을 그리고, 포함 여부 확인
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = canvas.width; tempCanvas.height = canvas.height;
+            const tCtx = tempCanvas.getContext('2d');
+            
+            tCtx.beginPath();
+            tCtx.moveTo(polygonPoints[0].x, polygonPoints[0].y);
+            for(let i=1; i<polygonPoints.length; i++) {
+                tCtx.lineTo(polygonPoints[i].x, polygonPoints[i].y);
             }
+            tCtx.closePath();
+            tCtx.fill();
 
-            if (!isDrawing || mode === 'calibrate') return;
-
-            let startCol = Math.max(0, Math.floor((x - brushSizeCM/2) / GRID_RES));
-            let endCol = Math.min(cols - 1, Math.floor((x + brushSizeCM/2) / GRID_RES));
-            let startRow = Math.max(0, Math.floor((y - brushSizeCM/2) / GRID_RES));
-            let endRow = Math.min(rows - 1, Math.floor((y + brushSizeCM/2) / GRID_RES));
-
-            for(let r = startRow; r <= endRow; r++) {
-                for(let c = startCol; c <= endCol; c++) {
-                    let cellCX = c * GRID_RES + GRID_RES/2;
-                    let cellCY = r * GRID_RES + GRID_RES/2;
-                    let dist = Math.sqrt(Math.pow(cellCX - x, 2) + Math.pow(cellCY - y, 2));
-                    if (dist <= brushSizeCM/2) {
-                        roomGrid[r][c] = (mode === 'draw');
+            // 픽셀 데이터를 읽어와서 그리드 배열에 저장 (매우 정확함)
+            const imgData = tCtx.getImageData(0, 0, canvas.width, canvas.height).data;
+            for(let r = 0; r < rows; r++) {
+                for(let c = 0; c < cols; c++) {
+                    let pxX = Math.floor(c * GRID_RES + GRID_RES/2);
+                    let pxY = Math.floor(r * GRID_RES + GRID_RES/2);
+                    let idx = (pxY * canvas.width + pxX) * 4 + 3; // Alpha channel
+                    if (imgData[idx] > 0) {
+                        roomGrid[r][c] = true;
                     }
                 }
             }
-            redraw(); 
         }
 
+        let requiredMats = [];
+
+        // 실시간 매트 필요 수량 계산
+        function calculateMats() {
+            if (!isPolygonClosed) return;
+            requiredMats = [];
+            let count = 0;
+            const matGridSize = matSizeCM / GRID_RES; 
+
+            // 사용자가 슬라이더로 조절한 그리드 오프셋 적용
+            let offX = gridOffsetX / GRID_RES;
+            let offY = gridOffsetY / GRID_RES;
+
+            for(let matCol = -10; matCol <= cols / matGridSize; matCol++) {
+                for(let matRow = -10; matRow <= rows / matGridSize; matRow++) {
+                    
+                    let startC = matCol * matGridSize + offX;
+                    let startR = matRow * matGridSize + offY;
+                    let matUsed = false;
+
+                    for(let r = 0; r < matGridSize; r++) {
+                        for(let c = 0; c < matGridSize; c++) {
+                            let checkR = Math.floor(startR + r);
+                            let checkC = Math.floor(startC + c);
+                            
+                            if(checkR >= 0 && checkR < rows && checkC >= 0 && checkC < cols) {
+                                if(roomGrid[checkR][checkC]) {
+                                    matUsed = true; break;
+                                }
+                            }
+                        }
+                        if(matUsed) break;
+                    }
+
+                    if(matUsed) {
+                        count++;
+                        requiredMats.push({x: startC, y: startR});
+                    }
+                }
+            }
+            document.getElementById('mat-count').innerHTML = count + `<span class="unit"> 장</span>`;
+        }
+
+        // 화면 렌더링
         function redraw() {
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // 도면 그리기
+            // 도면 그리기 (중앙 정렬)
             if (bgImg) {
                 ctx.globalAlpha = bgOpacity;
                 const imgW = bgImg.width * bgScale;
                 const imgH = bgImg.height * bgScale;
-                ctx.drawImage(bgImg, 50, 50, imgW, imgH);
+                ctx.drawImage(bgImg, bgOffsetX, bgOffsetY, imgW, imgH);
                 ctx.globalAlpha = 1.0; 
             }
 
-            // 모눈종이 그리기 (100px = 1m)
+            // 모눈종이 그리기 (슬라이더 조절에 따라 선이 함께 움직임)
             ctx.strokeStyle = '#e0e0e0';
-            for (let i = 0; i <= canvas.width; i += 10) {
-                ctx.lineWidth = (i % 100 === 0) ? 1.5 : 0.5; 
-                ctx.strokeStyle = (i % 100 === 0) ? '#bbbbbb' : '#e0e0e0';
+            for (let i = gridOffsetX % 100; i <= canvas.width; i += 10) {
+                let isBold = (i - (gridOffsetX % 100)) % 100 === 0;
+                ctx.lineWidth = isBold ? 1.5 : 0.5; 
+                ctx.strokeStyle = isBold ? '#bbbbbb' : '#e0e0e0';
                 ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
+            }
+            for (let i = gridOffsetY % 100; i <= canvas.height; i += 10) {
+                let isBold = (i - (gridOffsetY % 100)) % 100 === 0;
+                ctx.lineWidth = isBold ? 1.5 : 0.5; 
+                ctx.strokeStyle = isBold ? '#bbbbbb' : '#e0e0e0';
                 ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); ctx.stroke();
             }
 
-            // 칠한 영역 그리기
-            ctx.fillStyle = 'rgba(119, 172, 241, 0.6)';
-            for(let r = 0; r < rows; r++) {
-                for(let c = 0; c < cols; c++) {
-                    if(roomGrid[r][c]) {
-                        ctx.fillRect(c * GRID_RES, r * GRID_RES, GRID_RES, GRID_RES);
-                    }
+            // 사용자가 찍은 방 면적(다각형) 그리기
+            if (polygonPoints.length > 0) {
+                ctx.fillStyle = isPolygonClosed ? 'rgba(119, 172, 241, 0.4)' : 'transparent';
+                ctx.strokeStyle = '#77acf1';
+                ctx.lineWidth = 3;
+                
+                ctx.beginPath();
+                ctx.moveTo(polygonPoints[0].x, polygonPoints[0].y);
+                for (let i = 1; i < polygonPoints.length; i++) {
+                    ctx.lineTo(polygonPoints[i].x, polygonPoints[i].y);
                 }
+                
+                // 아직 닫히지 않았으면 마우스 포인터까지 임시 선 연결
+                if (!isPolygonClosed && currentMousePos && mode === 'draw') {
+                    ctx.lineTo(currentMousePos.x, currentMousePos.y);
+                } else if (isPolygonClosed) {
+                    ctx.closePath();
+                    ctx.fill();
+                }
+                ctx.stroke();
+
+                // 모서리 점 포인트
+                ctx.fillStyle = '#fff';
+                ctx.strokeStyle = '#77acf1';
+                polygonPoints.forEach(p => {
+                    ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+                });
             }
 
-            // 스케일 잡기 선 그리기
-            if (mode === 'calibrate' && calibStart && currentMousePos) {
-                ctx.strokeStyle = '#9b59b6';
-                ctx.lineWidth = 3;
-                ctx.beginPath();
-                ctx.moveTo(calibStart.x, calibStart.y);
-                ctx.lineTo(currentMousePos.x, currentMousePos.y);
-                ctx.stroke();
-                
-                // 양 끝 점
+            // 스케일 잡기 선
+            if (mode === 'calibrate' && calibStart && currentMousePos && isDraggingCalib) {
+                ctx.strokeStyle = '#9b59b6'; ctx.lineWidth = 3;
+                ctx.beginPath(); ctx.moveTo(calibStart.x, calibStart.y); ctx.lineTo(currentMousePos.x, currentMousePos.y); ctx.stroke();
                 ctx.fillStyle = '#9b59b6';
                 ctx.beginPath(); ctx.arc(calibStart.x, calibStart.y, 5, 0, Math.PI*2); ctx.fill();
                 ctx.beginPath(); ctx.arc(currentMousePos.x, currentMousePos.y, 5, 0, Math.PI*2); ctx.fill();
             }
 
-            // AI 계산 매트 그리기
-            if (bestMats.length > 0) {
+            // 매트 배치 결과 그리기
+            if (isPolygonClosed && requiredMats.length > 0) {
                 ctx.strokeStyle = '#ff4757'; 
                 ctx.lineWidth = 2;
                 ctx.fillStyle = 'rgba(255, 71, 87, 0.2)'; 
                 
-                bestMats.forEach(mat => {
+                requiredMats.forEach(mat => {
                     const pxX = mat.x * GRID_RES;
                     const pxY = mat.y * GRID_RES;
                     ctx.fillRect(pxX, pxY, matSizeCM, matSizeCM);
@@ -315,78 +414,6 @@
                 });
             }
         }
-
-        // AI 최적화 알고리즘
-        document.getElementById('btnAI').addEventListener('click', () => {
-            let minMatsNeeded = Infinity;
-            let worstMatsNeeded = 0; 
-            let optimalMatPositions = [];
-
-            const matGridSize = matSizeCM / GRID_RES; 
-
-            for(let offsetX = 0; offsetX < matGridSize; offsetX++) {
-                for(let offsetY = 0; offsetY < matGridSize; offsetY++) {
-                    
-                    let currentMatsNeeded = 0;
-                    let currentMatPositions = [];
-
-                    for(let matCol = -1; matCol <= cols / matGridSize; matCol++) {
-                        for(let matRow = -1; matRow <= rows / matGridSize; matRow++) {
-                            
-                            let startC = matCol * matGridSize + offsetX;
-                            let startR = matRow * matGridSize + offsetY;
-                            let matUsed = false;
-
-                            for(let r = 0; r < matGridSize; r++) {
-                                for(let c = 0; c < matGridSize; c++) {
-                                    let checkR = startR + r;
-                                    let checkC = startC + c;
-                                    
-                                    if(checkR >= 0 && checkR < rows && checkC >= 0 && checkC < cols) {
-                                        if(roomGrid[checkR][checkC]) {
-                                            matUsed = true;
-                                            break;
-                                        }
-                                    }
-                                }
-                                if(matUsed) break;
-                            }
-
-                            if(matUsed) {
-                                currentMatsNeeded++;
-                                currentMatPositions.push({x: startC, y: startR});
-                            }
-                        }
-                    }
-
-                    if(currentMatsNeeded > worstMatsNeeded) worstMatsNeeded = currentMatsNeeded;
-
-                    if(currentMatsNeeded > 0 && currentMatsNeeded < minMatsNeeded) {
-                        minMatsNeeded = currentMatsNeeded;
-                        optimalMatPositions = currentMatPositions;
-                    }
-                }
-            }
-
-            if (minMatsNeeded === Infinity) {
-                alert("브러쉬로 시공할 공간을 먼저 색칠해주세요!");
-                return;
-            }
-
-            bestMats = optimalMatPositions;
-            document.getElementById('mat-count').innerHTML = minMatsNeeded + `<span class="unit"> 장 (${matSizeCM}cm)</span>`;
-            
-            let saved = worstMatsNeeded - minMatsNeeded;
-            let msgEl = document.getElementById('saving-msg');
-            if (saved > 0) {
-                msgEl.innerText = `💡 기준점 미세조정으로 ${saved}장의 매트를 아꼈습니다!`;
-                msgEl.style.display = 'block';
-            } else {
-                msgEl.style.display = 'none';
-            }
-            
-            redraw();
-        });
 
         redraw();
     </script>
